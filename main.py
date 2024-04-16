@@ -44,8 +44,6 @@ def main(args):
     
     matched_images = Matching(images=images, focal_len=args.focal_len)
     
-    # feacture detection:
-    
     # feature matching:
 
     # image matching**:
