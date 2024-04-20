@@ -1,6 +1,6 @@
 # VFX_project2 -- Image Stitching
 
-**feacture detection**:
+**feacture detection**: Harris corner detector
 
 **feature matching**:
 
