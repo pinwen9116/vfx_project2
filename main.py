@@ -30,7 +30,7 @@ def load_images(root):
 
     images = []
     for i in range(17):
-        image_path = root + "/image_{i}.jpg"
+        image_path = root + f"/image_{i}.jpg"
         image = cv2.imread(image_path)
         images.append(image)
 
