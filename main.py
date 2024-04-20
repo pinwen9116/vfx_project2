@@ -39,7 +39,7 @@ def load_images(root):
 
 
 def main(args):
-    images = cv2.imread(args.root)
+    images = load_images(args.root)
     os.makedirs(args.result_path, exist_ok = True)
     
     matched_images = Matching(images=images, focal_len=args.focal_len)
