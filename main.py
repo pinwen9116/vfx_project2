@@ -10,13 +10,13 @@ from util import Matching
 
 def parse_arguments():
     parser = ArgumentParser()
-    parser.add_argument('--root', type=str, default='../data/original/scene2')
+    parser.add_argument('--root', type=str, default='test_data/parrington')
     parser.add_argument('--result_path', type=str, default='../result')
     parser.add_argument("--focal_len", type=float, default=801.63)
     args = parser.parse_args()
     return args
 
-def load_images(root, ann_path):
+def load_images(root):
     '''Get images and corresponding shutter times according to the annotation file.
 
     Args:
@@ -29,7 +29,7 @@ def load_images(root, ann_path):
     print('Loading images...')
 
     images = []
-    for i in range(5):
+    for i in range(17):
         image_path = root + "/image_{i}.jpg"
         image = cv2.imread(image_path)
         images.append(image)
