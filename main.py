@@ -12,7 +12,7 @@ def parse_arguments():
     parser = ArgumentParser()
     parser.add_argument('--root', type=str, default='test_data/parrington')
     parser.add_argument('--result_path', type=str, default='../result')
-    parser.add_argument("--focal_len", type=float, default=801.63)
+    parser.add_argument("--focal_len", type=float, default=897.93)
     args = parser.parse_args()
     return args
 

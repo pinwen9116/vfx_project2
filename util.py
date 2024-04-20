@@ -35,9 +35,8 @@ class Matching():
         ## Harris detector
         sigma = 3
         w = 5
-        threshold = 0.5            ## might need to change
         k = 0.05
-
+        images_R = []
         # Sobel kernels
         Sx = np.array([
             [1, 0, -1],
@@ -53,13 +52,15 @@ class Matching():
             [1, 2, 1]])/16
         
         for img in self.images:
-
+            ## gray scale
             gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
             gray = np.float32(gray)
-            I = cv2.GaussianBlur(gray, (w, w), sigma)
+
             ## get gradient
+            I = cv2.GaussianBlur(gray, (w, w), sigma)
             Ix, Iy = cv2.Sobel(I, cv2.CV_64F, 1, 0, w), cv2.Sobel(I, cv2.CV_64F, 0, 1, w)
             
+            ## computer corner response
             Ix2 = Ix ** 2
             Iy2 = Iy ** 2
             Ixy = Ix * Iy
@@ -67,11 +68,10 @@ class Matching():
             Sy2 = cv2.GaussianBlur(Iy2, (w, w), sigma)
             Sxy = cv2.GaussianBlur(Ixy, (w, w), sigma)
 
-            ## computer corner response
             R = (Sx2 * Sy2 - Sxy ** 2) - k * (Sx2+Sy2) ** 2
-
+            images_R.append(R)
             ## for debug
-            print(R)
+            # print(R)
 
 
     
