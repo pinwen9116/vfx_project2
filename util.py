@@ -54,7 +54,7 @@ class Matching():
         
         for img in self.images:
 
-            gray = cv2.cvtColor(self.images, cv2.COLOR_RGB2GRAY)
+            gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
             gray = np.float32(gray)
             I = cv2.GaussianBlur(gray, (w, w), sigma)
             ## get gradient
