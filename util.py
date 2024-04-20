@@ -52,7 +52,7 @@ class Matching():
             [2, 4, 2],
             [1, 2, 1]])/16
         
-        gray = cv2.cvtColor(self.warping, cv2.COLOR_RGB2GRAY)
+        gray = cv2.cvtColor(self.images, cv2.COLOR_RGB2GRAY)
         gray = np.float32(gray)
         I = cv2.GaussianBlur(gray, (w, w), sigma)
         ## get gradient
@@ -71,5 +71,5 @@ class Matching():
         ## for debug
         print(R)
 
-        
+
     
