@@ -52,24 +52,26 @@ class Matching():
             [2, 4, 2],
             [1, 2, 1]])/16
         
-        gray = cv2.cvtColor(self.images, cv2.COLOR_RGB2GRAY)
-        gray = np.float32(gray)
-        I = cv2.GaussianBlur(gray, (w, w), sigma)
-        ## get gradient
-        Ix, Iy = cv2.Sobel(I, cv2.CV_64F, 1, 0, w), cv2.Sobel(I, cv2.CV_64F, 0, 1, w)
-        
-        Ix2 = Ix ** 2
-        Iy2 = Iy ** 2
-        Ixy = Ix * Iy
-        Sx2 = cv2.GaussianBlur(Ix2, (w, w), sigma)
-        Sy2 = cv2.GaussianBlur(Iy2, (w, w), sigma)
-        Sxy = cv2.GaussianBlur(Ixy, (w, w), sigma)
+        for img in self.images:
 
-        ## computer corner response
-        R = (Sx2 * Sy2 - Sxy ** 2) - k * (Sx2+Sy2) ** 2
+            gray = cv2.cvtColor(self.images, cv2.COLOR_RGB2GRAY)
+            gray = np.float32(gray)
+            I = cv2.GaussianBlur(gray, (w, w), sigma)
+            ## get gradient
+            Ix, Iy = cv2.Sobel(I, cv2.CV_64F, 1, 0, w), cv2.Sobel(I, cv2.CV_64F, 0, 1, w)
+            
+            Ix2 = Ix ** 2
+            Iy2 = Iy ** 2
+            Ixy = Ix * Iy
+            Sx2 = cv2.GaussianBlur(Ix2, (w, w), sigma)
+            Sy2 = cv2.GaussianBlur(Iy2, (w, w), sigma)
+            Sxy = cv2.GaussianBlur(Ixy, (w, w), sigma)
 
-        ## for debug
-        print(R)
+            ## computer corner response
+            R = (Sx2 * Sy2 - Sxy ** 2) - k * (Sx2+Sy2) ** 2
+
+            ## for debug
+            print(R)
 
 
     
