@@ -28,7 +28,7 @@ class Matching():
                 y = round(math.sqrt(x**2 + self.focal_len ** 2) * (new_y) / self.focal_len)
                 
                 if (0 <= x) and (x < self.w) and (0 <= y) and (y < self.h):
-                    warped_images[: , new_y, new_x, :] = images[: , y, x, :]
+                    warped_images[: , new_y, new_x, :] = images[: , y, x, ::-1]
         
         # Visualization
         plot_image(warped_images[:5], './test_data/visualization/warp_images.jpg')
