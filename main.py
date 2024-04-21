@@ -42,10 +42,10 @@ def main(args):
     images = load_images(args.root)
     os.makedirs(args.result_path, exist_ok = True)
     
-    matched_images = Matching(images=images, focal_len=args.focal_len)
+    match = Matching(images=images, focal_len=args.focal_len)
     
     # feature detection:
-    matched_images.detection()
+    match.detection()
 
     # feature matching:
 
