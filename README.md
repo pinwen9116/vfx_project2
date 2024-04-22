@@ -6,6 +6,4 @@
 
 **image matching**:
 
-bundle adjustment:
-
 blending:
