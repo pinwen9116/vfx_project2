@@ -45,7 +45,7 @@ def main(args):
     match = Matching(images=images, focal_len=args.focal_len)
     
     # feature detection:
-    match.detection()
+    feat_point_list, descriptor_list = match.detection()
 
     # feature matching:
 
