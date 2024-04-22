@@ -74,4 +74,41 @@ class Matching():
             Sxy = cv2.GaussianBlur(Ixy, (w, w), sigma)
 
             R = (Sx2 * Sy2 - Sxy ** 2) - k * (Sx2+Sy2) ** 2  # (h, w)
-            images_R.append(R)
+
+            feat_pts_x, feat_pts_y = self._find_feat_points(R, np.mean(R) + 0.5 * np.std(R))
+            print(feat_pts_x.shape, feat_pts_y.shape)
+
+    def _find_feat_points(
+        self, 
+        response: np.array, 
+        thres: float,
+    ):
+        '''Find feature points satisfying:
+        1) Corner response is higher than the threshold.
+        2) Corner response is higher that that of it\'s neighbor\'s
+
+        Args:
+            response (np.array): Harris corner response. Shape: (h, w).
+            threshold
+
+        Return:
+            feat_points_x (np.array), feat_points_y (np.array)
+        '''
+        feat_points = np.zeros(response.shape, np.uint8)
+        feat_points[response >= thres] = 1
+
+        for y in range(3):
+            for x in range(3):
+                if x == 1 and y == 1:
+                    continue
+                kernel = np.zeros((3, 3))
+                kernel[1, 1] = 1
+                kernel[y, x] = -1
+
+                filtered = np.sign(cv2.filter2D(response, -1, kernel))
+                filtered[filtered < 0] = 0
+                feat_points &= np.uint8(filtered)
+
+        feat_points = np.where(feat_points == 1)
+
+        return feat_points[1], feat_points[0] 
