@@ -48,6 +48,7 @@ def main(args):
     feat_point_list, descriptor_list = match.detection()
 
     # feature matching:
+    coord_pairs = match.feature_match(feat_point_list, descriptor_list)
 
     # image matching**:
 

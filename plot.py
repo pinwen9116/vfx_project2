@@ -70,3 +70,27 @@ def plot_orientations(
         cv2.arrowedLine(img, (fp_x, fp_y), (fp_x + dx, fp_y + dy), color=(0, 0, 255), thickness=2)  
     
     cv2.imwrite(save_path, img)
+
+
+def plot_feature_match(
+    image_1: np.array,
+    feat_points_1: list,
+    image_2: np.array,
+    feat_points_2: list,
+    save_path: str,
+) -> None: 
+    h, w, c = image_1.shape
+
+    img = np.zeros((h, w * 2, c))
+    img[:h, :w] = image_1
+    img[:h, w:] = image_2
+
+    for feat_pt1, feat_pt2 in zip(feat_points_1, feat_points_2):
+        feat_pt2[0] = feat_pt2[0] + w
+
+        feat_pt1 = tuple(feat_pt1)
+        feat_pt2 = tuple(feat_pt2)
+
+        cv2.line(img, feat_pt1, feat_pt2, color=(0, 0, 255), thickness=1)
+    
+    cv2.imwrite(save_path, img)

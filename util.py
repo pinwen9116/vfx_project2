@@ -4,6 +4,7 @@ import numpy as np
 import math
 
 from plot import *
+from scipy.spatial.distance import cdist
 from tqdm.auto import tqdm
 
 
@@ -17,6 +18,7 @@ class Matching():
             n_bins: float=8,
             p_size: int=8,
             desc_thres: float=0.2,
+            match_dist_ratio: float=0.8,
             visualization: bool=True,
         ) -> None:
         self.n_images = images.shape[0]
@@ -29,6 +31,7 @@ class Matching():
         self._n_bins = n_bins
         self._p_size = p_size
         self._desc_thres = desc_thres
+        self._match_dist_ratio = match_dist_ratio
 
         self.visualization = visualization
         self.images = self.warping(images) # shape: (17, 512, 384, 3)
@@ -96,6 +99,65 @@ class Matching():
             plot_orientations(self.images[0], feat_point_list[0], orientation_list[0], './test_data/visualization/feature_orientations.jpg')
 
         return feat_point_list, descriptor_list
+    
+    def feature_match(
+        self,
+        feat_point_list: list,
+        descriptor_list: list,
+    ) -> list:
+        '''Implementation of feature match.
+        
+        Args:
+            feat_point_list (list): A list of feature points of each image. Shape: (n_image, n_points, 2).
+            descriptor_list (list): A list of feature descriptors corresponding to each feature points of each image. Shape: (n_image, n_points, 128).        
+        Return:
+            coord_pairs (list): A list of matched feature points. [n_pairs, 2 (n_image), n_matches, 2 (x, y)]
+        '''
+        print('Feature matching...')
+
+        coord_pairs = list()
+        for i in tqdm(range(self.n_images - 1)):
+            coords_1, coords_2 = self._match_two_images(self.images[i: i+2], feat_point_list[i: i+2], descriptor_list[i: i+2])
+            coord_pairs.append([coords_1, coords_2])
+        
+        return coord_pairs
+
+    def _match_two_images(
+        self,
+        images: np.array,
+        feat_points: list,
+        descriptors: list,
+    ) -> tuple:
+        '''Match feature points between two image. The distance ratio between two descriptors should be less than the given ratio.
+        
+        Args:
+            feat_point_list (list): A list of feature points of each image. Shape: (2, n_points, 2).
+            descriptor_list (list): A list of feature descriptors corresponding to each feature points of each image. Shape: (2, n_points, 128).        
+        Return:
+            coords_1 (list): The list of matched feature point coordinates in the first image. Shape: (n_match, 2).
+            coords_2 (list): The list of marched feature point coordinates in the second image. Shape: (n_match, 2).
+        '''
+        image_1, image_2 = images[0], images[1]
+        feat_points_1, feat_points_2 = feat_points[0], feat_points[1]
+        descriptors_1, descriptors_2 = descriptors[0], descriptors[1]
+
+        dists = cdist(descriptors_1, descriptors_2, 'euclidean')  # shape: (n_feat_points_1, n_feat_points_2)
+        arg_dists = np.argsort(dists, axis=1)
+
+        coords_1 = list()
+        coords_2 = list()
+        for i, arg_dist in enumerate(arg_dists):
+            j1 = arg_dist[0]
+            j2 = arg_dist[1]
+
+            if  dists[i, j1] / dists[i, j2] < self._match_dist_ratio:
+                coords_1.append(feat_points_1[i])
+                coords_2.append(feat_points_2[j1])
+        
+        if self.visualization:
+            plot_feature_match(image_2, coords_2, image_1, coords_1, './test_data/visualization/feature_match.jpg')
+
+        return coords_1, coords_2
 
     def _feat_points_selection(
         self, 
@@ -108,7 +170,7 @@ class Matching():
 
         Args:
             response (np.array): Harris corner response. Shape: (h, w).
-            threshold
+            thres (float): The corner response threshold for feature points selection.
 
         Return:
             feat_points (tuple): A tuple of feature points with format (y-coordinates, x-coordinates)
