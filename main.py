@@ -10,7 +10,7 @@ from util import Matching
 
 def parse_arguments():
     parser = ArgumentParser()
-    parser.add_argument('--root', type=str, default='test_data/parrington')
+    parser.add_argument('--root', type=str, default='images')
     parser.add_argument('--result_path', type=str, default='../result')
     parser.add_argument("--focal_len", type=float, default=897.93)
     args = parser.parse_args()
@@ -29,8 +29,8 @@ def load_images(root):
     print('Loading images...')
 
     images = []
-    for i in range(17):
-        image_path = root + f"/image_{i}.jpg"
+    for i in range(20):
+        image_path = root + f"/IMG_0{103+i}.jpg"
         image = cv2.imread(image_path)
         images.append(image)
 
