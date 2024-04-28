@@ -12,7 +12,7 @@ def parse_arguments():
     parser = ArgumentParser()
     parser.add_argument('--root', type=str, default='images')
     parser.add_argument('--result_path', type=str, default='../result')
-    parser.add_argument("--focal_len", type=float, default=897.93)
+    parser.add_argument("--focal_len", type=float, default=1800)
     args = parser.parse_args()
     return args
 
@@ -30,8 +30,10 @@ def load_images(root):
 
     images = []
     for i in range(20):
-        image_path = root + f"/IMG_0{103+i}.jpg"
+        image_path = root + f"/IMG_0{103+i}.JPG"
         image = cv2.imread(image_path)
+        image = cv2.resize(image, (870, 580), interpolation=cv2.INTER_AREA)
+
         images.append(image)
 
     return np.array(images)
@@ -40,6 +42,7 @@ def load_images(root):
 
 def main(args):
     images = load_images(args.root)
+    print(images.shape)
     os.makedirs(args.result_path, exist_ok = True)
     
     match = Matching(images=images, focal_len=args.focal_len)
