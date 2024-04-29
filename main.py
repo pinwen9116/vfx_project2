@@ -12,7 +12,7 @@ def parse_arguments():
     parser = ArgumentParser()
     parser.add_argument('--root', type=str, default='images')
     parser.add_argument('--result_path', type=str, default='../result')
-    parser.add_argument("--focal_len", type=float, default=1800)
+    parser.add_argument("--focal_len", type=float, default=1900)
     args = parser.parse_args()
     return args
 

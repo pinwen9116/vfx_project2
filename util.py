@@ -39,10 +39,16 @@ class Matching():
     def warping(self, images):
         warped_images = np.zeros(images.shape, 'uint8')
 
+        x0 = self.w // 2
+        y0 = self.h // 2
+
         for new_y in range(self.h):
             for new_x in range(self.w):
-                x = round(self.focal_len * math.tan((new_x) / self.focal_len))
-                y = round(math.sqrt(x**2 + self.focal_len ** 2) * (new_y) / self.focal_len)
+                x = round(self.focal_len * math.tan((new_x - x0) / self.focal_len) + x0)
+                y = round(math.sqrt(x**2 + self.focal_len ** 2) * (new_y - y0) / self.focal_len + y0)
+
+                # x = round(self.focal_len * math.tan((new_x) / self.focal_len))
+                # y = round(math.sqrt(x**2 + self.focal_len ** 2) * (new_y) / self.focal_len)
                 
                 if (0 <= x) and (x < self.w) and (0 <= y) and (y < self.h):
                     warped_images[: , new_y, new_x, :] = images[: , y, x, ::-1]
@@ -155,7 +161,7 @@ class Matching():
                 coords_2.append(feat_points_2[j1])
         
         if self.visualization:
-            plot_feature_match(image_2, coords_2, image_1, coords_1, './test_data/visualization/feature_match.jpg')
+            plot_feature_match(image_1, coords_1, image_2, coords_2, './test_data/visualization/feature_match.jpg')
 
         return coords_1, coords_2
 
