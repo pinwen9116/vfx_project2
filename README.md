@@ -6,7 +6,7 @@
 
 ## Execution
 ```bash=
-main.py [-h] [--root ROOT] [--result_path RESULT_PATH] [--focal_len FOCAL_LEN]
+python main.py [-h] [--root ROOT] [--result_path RESULT_PATH] [--focal_len FOCAL_LEN]
 ```
 
 **Optional arguments**
