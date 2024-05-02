@@ -20,6 +20,8 @@ class Matching():
             p_size: int=8,
             desc_thres: float=0.2,
             match_dist_ratio: float=0.8,
+            n_iter: int=10000,
+            ransac_in_thres: int=5,
             visualization: bool=True,
         ) -> None:
         self.n_images = images.shape[0]
@@ -33,6 +35,8 @@ class Matching():
         self._p_size = p_size
         self._desc_thres = desc_thres
         self._match_dist_ratio = match_dist_ratio
+        self._n_iter = n_iter
+        self._ransac_in_thres = ransac_in_thres
 
         self.visualization = visualization
         self.images = self.warping(images) # shape: (17, 512, 384, 3)
@@ -310,7 +314,29 @@ class Matching():
     ):
         norm = np.linalg.norm(vector)
         return vector / norm if norm != 0 else vector
-    
+
+    def image_matching(
+        self,
+        coord_pairs: list,
+    ) -> np.array:
+        '''Match two images based the matching feature points.
+
+        Args:
+            coord_pairs (list): A list of matched feature points. [n_pairs, 2 (n_image), n_matches, 2 (x, y)]
+        Return:
+            An array of homography matrix.
+        '''
+        print(f'Image matching...')
+
+        homo_matrices = list()
+        for coord_pair in tqdm(coord_pairs):
+            n_sample = len(coord_pair[0])
+            n_subSample = n_sample // 10
+            homo_matrix = self.RANSAC(coord_pair, n_sample=n_sample, n_iter=self._n_iter, n_subSample=n_subSample, threshold=self._ransac_in_thres)
+            homo_matrices.append(homo_matrix)
+        
+        return np.array(homo_matrices)
+
     def RANSAC(
             self,
             coor_pair,
@@ -340,28 +366,27 @@ class Matching():
             # Draw `n_subSample` points and fit the model with them.
             subSampleIdx = random.sample(range(n_sample), n_subSample)  # (n_subSample, 2)
             H = self.homography(coor_1[subSampleIdx], coor_2[subSampleIdx])
-            print(f'H.shape: {H.shape}')  # (3, 3)
+
             num_in = 0
 
             for idx in range(n_sample):
                 if idx not in subSampleIdx:
-                    concate_coor = np.hstack((coor_1[idx], coor_2[idx]))
-                    print(f'concate_coor.shape: {concate_coor.shape}') # (4, )
-                    dst_coor = H @ concate_coor.T
+                    test = np.array([coor_1[idx][0], coor_1[idx][1], 1])
+                    dst_coor = H @ test.T
+
                     if dst_coor[2] <= 1e-5:      ## avoid 0 division
                         continue
-                    # Q: 為什麼要 /= 2?
-                    dst_coor /= 2
-                    # 為什麼是這兩個相減，應該要用到 `dst_coor` 才對吧
-                    if (np.linalg.norm(coor_pair[:2][1] - coor_pair[idx][1]) < threshold):
+                    dst_coor /= dst_coor[2]
+
+                    if (np.linalg.norm(coor_2[idx][:2] - dst_coor[:2]) < threshold):
                         num_in += 1
+
             if max_in <= num_in:
                 max_in = num_in
                 best_H = H
 
         return best_H
 
-    # TODO: Check the formula and shape of H.
     def homography(
             self,
             P,

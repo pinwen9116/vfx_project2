@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import pandas as pd
 from argparse import ArgumentParser
+from tqdm.auto import tqdm
 
 from util import Matching
 
@@ -54,12 +55,12 @@ def main(args):
     coord_pairs = match.feature_match(feat_point_list, descriptor_list)
 
     # image matching:
-    for coord_pair in coord_pairs:
-        n_sample = len(coord_pair[0])
-        n_subSample = n_sample // 10
-        # TODO: Determine threshold.
-        match.RANSAC(coord_pair, n_sample=n_sample, n_iter=1, n_subSample=n_subSample, threshold=5)
-        break
+    homo_matrices = match.image_matching(coord_pairs)
+    # for coord_pair in tqdm(coord_pairs):
+    #     n_sample = len(coord_pair[0])
+    #     n_subSample = n_sample // 10
+    #     homo_matrix = match.RANSAC(coord_pair, n_sample=n_sample, n_iter=100, n_subSample=n_subSample, threshold=5)
+    #     homo_matrices.append(homo_matrix)
 
     # bundle adjustment:
 
