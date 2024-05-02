@@ -54,6 +54,12 @@ def main(args):
     coord_pairs = match.feature_match(feat_point_list, descriptor_list)
 
     # image matching:
+    for coord_pair in coord_pairs:
+        n_sample = len(coord_pair[0])
+        n_subSample = n_sample // 10
+        # TODO: Determine threshold.
+        match.RANSAC(coord_pair, n_sample=n_sample, n_iter=1, n_subSample=n_subSample, threshold=5)
+        break
 
     # bundle adjustment:
 

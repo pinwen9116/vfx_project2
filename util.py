@@ -319,26 +319,49 @@ class Matching():
             n_subSample,
             threshold
     ):
+        '''Implementation of RANSAC
+
+        Args:
+            coor_pair (list): The coordinates of the matching pairs between two images. `coor_pair[0]` represents the points in the first image, while `coor_pair[0]` represents that in the second one.
+            n_sample (int): Number of matching pairs. This should be equal to `len(coor_pair[0])` and `len(coor_pair[1])`.
+            n_iter (int): The number of iteration.
+            n_subSample (int): The number of samples to formulate the fitted model.
+            threshold (float): 
+
+        Return:
+            H (np.array): The homography matrix
+        '''
+        coor_1 = np.array(coor_pair[0])
+        coor_2 = np.array(coor_pair[1])
+
         max_in = 0
         best_H = None
-        for iter in range(n_iter):
-            subSampleIdx = random.sample(range(n_sample), n_subSample)
-            H = self.homography(coor_pair[subSampleIdx][0], coor_pair[subSampleIdx][1])
+        for _ in range(n_iter):
+            # Draw `n_subSample` points and fit the model with them.
+            subSampleIdx = random.sample(range(n_sample), n_subSample)  # (n_subSample, 2)
+            H = self.homography(coor_1[subSampleIdx], coor_2[subSampleIdx])
+            print(f'H.shape: {H.shape}')  # (3, 3)
             num_in = 0
 
-            if iter not in subSampleIdx:
-                concate_coor = np.hstack((coor_pair[iter][0], [1]))
-                dst_coor =H @ concate_coor.T
-                if dst_coor[2] <= 1e-5:      ## avoid 0 division
-                    continue
-                dst_coor /= 2
-                if (np.linalg.norm(coor_pair[:2][1] - coor_pair[iter][1]) < threshold):
-                    num_in += 1
-            if max_in < num_in:
+            for idx in range(n_sample):
+                if idx not in subSampleIdx:
+                    concate_coor = np.hstack((coor_1[idx], coor_2[idx]))
+                    print(f'concate_coor.shape: {concate_coor.shape}') # (4, )
+                    dst_coor = H @ concate_coor.T
+                    if dst_coor[2] <= 1e-5:      ## avoid 0 division
+                        continue
+                    # Q: 為什麼要 /= 2?
+                    dst_coor /= 2
+                    # 為什麼是這兩個相減，應該要用到 `dst_coor` 才對吧
+                    if (np.linalg.norm(coor_pair[:2][1] - coor_pair[idx][1]) < threshold):
+                        num_in += 1
+            if max_in <= num_in:
                 max_in = num_in
                 best_H = H
+
         return best_H
 
+    # TODO: Check the formula and shape of H.
     def homography(
             self,
             P,
@@ -347,8 +370,8 @@ class Matching():
         # solve homography matrix
         A = []
         for r in range(len(P)):
-            print(m[r, 0])      ## for debug
-            A.append(-P[r, 0], -P[r, 1], -1, 0, 0, 0, P[r, 0]*m[r,0], P[r,1]*m[r,0], m[r, 0])
+            # print(m[r, 0])      ## for debug
+            A.append([-P[r, 0], -P[r, 1], -1, 0, 0, 0, P[r, 0]*m[r,0], P[r,1]*m[r,0], m[r, 0]])
             A.append([0, 0, 0, -P[r,0], -P[r,1], -1, P[r,0]*m[r,1], P[r,1]*m[r,1], m[r,1]])
         u, s, v = np.linalg.svd(A)
         H = np.reshape(v[8], (3, 3))            
