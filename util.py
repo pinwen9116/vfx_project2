@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 import math
+import random
 
 from plot import *
 from scipy.spatial.distance import cdist
@@ -315,3 +316,73 @@ class Matching():
     ):
         norm = np.linalg.norm(vector)
         return vector / norm if norm != 0 else vector
+    
+    def RANSAC(
+            self,
+            coor_pair,
+            n_sample,
+            n_iter,
+            n_subSample,
+            threshold
+    ):
+        max_in = 0
+        best_H = None
+        for iter in range(n_iter):
+            subSampleIdx = random.sample(range(n_sample), n_subSample)
+            H = self.homography(coor_pair[subSampleIdx][0], coor_pair[subSampleIdx][1])
+            num_in = 0
+
+            if iter not in subSampleIdx:
+                concate_coor = np.hstack((coor_pair[iter][0], [1]))
+                dst_coor =H @ concate_coor.T
+                if dst_coor[2] <= 1e-5:      ## avoid 0 division
+                    continue
+                dst_coor /= 2
+                if (np.linalg.norm(coor_pair[:2][1] - coor_pair[iter][1]) < threshold):
+                    num_in += 1
+            if max_in < num_in:
+                max_in = num_in
+                best_H = H
+        return best_H
+
+    def homography(
+            self,
+            P,
+            m
+    ):
+        # solve homography matrix
+        A = []
+        for r in range(len(P)):
+            print(m[r, 0])      ## for debug
+            A.append(-P[r, 0], -P[r, 1], -1, 0, 0, 0, P[r, 0]*m[r,0], P[r,1]*m[r,0], m[r, 0])
+            A.append([0, 0, 0, -P[r,0], -P[r,1], -1, P[r,0]*m[r,1], P[r,1]*m[r,1], m[r,1]])
+        u, s, v = np.linalg.svd(A)
+        H = np.reshape(v[8], (3, 3))            
+        ## normalize
+        H = (1/H.item(8)) * H
+        return H        
+    
+    def blending(
+            self,
+            homomat
+    ):
+        res = self.images[0]
+        inv_H = np.linalg.inv(homomat)
+        for i in range(1, self.n_images):
+            left_img = res
+            right_img = self.images[i]
+            (lh, lw) = left_img[:2]
+            (rh, rw) = right_img[:2]
+            stitch_res = np.zeros((max(lh, rh), lw+rw, 3), dtype='int')
+            for i in range(stitch_res.shape[0]):
+                for j in range(stitch_res.shape[1]):
+                    coor = np.array([j, i, 1])
+                    res_img_coor = inv_H @ coor
+                    res_img_coor /= res_img_coor[2]
+                    ## TODO: knn or  bilinear interpolation
+                    y, x = int(round(res_img_coor[0])), int(round(res_img_coor[1]))
+                    if x < 0 or x >= rh or y < 0 or y >= rw:
+                        continue
+                    stitch_res[i, j] = right_img[x, y]
+
+        ## TODO: blending

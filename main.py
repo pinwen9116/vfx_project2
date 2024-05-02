@@ -53,7 +53,7 @@ def main(args):
     # feature matching:
     coord_pairs = match.feature_match(feat_point_list, descriptor_list)
 
-    # image matching**:
+    # image matching:
 
     # bundle adjustment:
 
