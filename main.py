@@ -13,7 +13,7 @@ def parse_arguments():
     parser = ArgumentParser()
     parser.add_argument('--root', type=str, default='images')
     parser.add_argument('--result_path', type=str, default='../result')
-    parser.add_argument("--focal_len", type=float, default=1900)
+    parser.add_argument("--focal_len", type=float, default=1800)
     args = parser.parse_args()
     return args
 
@@ -40,7 +40,6 @@ def load_images(root):
     return np.array(images)
 
 
-
 def main(args):
     images = load_images(args.root)
     print(images.shape)
@@ -56,15 +55,11 @@ def main(args):
 
     # image matching:
     homo_matrices = match.image_matching(coord_pairs)
-    # for coord_pair in tqdm(coord_pairs):
-    #     n_sample = len(coord_pair[0])
-    #     n_subSample = n_sample // 10
-    #     homo_matrix = match.RANSAC(coord_pair, n_sample=n_sample, n_iter=100, n_subSample=n_subSample, threshold=5)
-    #     homo_matrices.append(homo_matrix)
-
-    # bundle adjustment:
 
     # blending:
+    panorama = match.blending(homo_matrices)
+
+    # bundle adjustment:
 
     
 if __name__ == '__main__':

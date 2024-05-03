@@ -15,12 +15,12 @@ class Matching():
             images: np.array,
             focal_len: float,
             k_size: int=5,
-            corner_resp_weight: float=1,  # Modify this attribute to control the number of feature points. Higher value leads to fewer points.
+            corner_resp_weight: float=0.5,  # Modify this attribute to control the number of feature points. Higher value leads to fewer points.
             n_bins: float=8,
             p_size: int=8,
             desc_thres: float=0.2,
             match_dist_ratio: float=0.8,
-            n_iter: int=10000,
+            n_iter: int=100000,
             ransac_in_thres: int=5,
             visualization: bool=True,
         ) -> None:
@@ -44,10 +44,13 @@ class Matching():
     def warping(self, images):
         warped_images = np.zeros(images.shape, 'uint8')
 
+        x_center = self.w // 2
+        y_center = self.h // 2
+
         for new_y in range(self.h):
             for new_x in range(self.w):
-                x = round(self.focal_len * math.tan((new_x) / self.focal_len))
-                y = round(math.sqrt(x**2 + self.focal_len ** 2) * (new_y) / self.focal_len)
+                x = round(self.focal_len * math.tan((new_x - x_center) / self.focal_len) + x_center)
+                y = round(math.sqrt(x**2 + self.focal_len ** 2) * (new_y - y_center) / self.focal_len + y_center)
                 
                 if (0 <= x) and (x < self.w) and (0 <= y) and (y < self.h):
                     warped_images[: , new_y, new_x, :] = images[: , y, x, ::-1]
@@ -160,7 +163,7 @@ class Matching():
                 coords_2.append(feat_points_2[j1])
         
         if self.visualization:
-            plot_feature_match(image_2, coords_2, image_1, coords_1, './test_data/visualization/feature_match.jpg')
+            plot_feature_match(image_1, coords_1, image_2, coords_2, './test_data/visualization/feature_match.jpg')
 
         return coords_1, coords_2
 
@@ -332,7 +335,7 @@ class Matching():
         for coord_pair in tqdm(coord_pairs):
             n_sample = len(coord_pair[0])
             n_subSample = n_sample // 10
-            homo_matrix = self.RANSAC(coord_pair, n_sample=n_sample, n_iter=self._n_iter, n_subSample=n_subSample, threshold=self._ransac_in_thres)
+            homo_matrix = self.RANSAC(coord_pair, n_sample=n_sample, n_iter=self._n_iter, n_subSample=4, threshold=self._ransac_in_thres)
             homo_matrices.append(homo_matrix)
         
         return np.array(homo_matrices)
@@ -406,25 +409,99 @@ class Matching():
     
     def blending(
             self,
-            homomat
-    ):
-        res = self.images[0]
-        inv_H = np.linalg.inv(homomat)
-        for i in range(1, self.n_images):
-            left_img = res
-            right_img = self.images[i]
-            (lh, lw) = left_img[:2]
-            (rh, rw) = right_img[:2]
-            stitch_res = np.zeros((max(lh, rh), lw+rw, 3), dtype='int')
-            for i in range(stitch_res.shape[0]):
-                for j in range(stitch_res.shape[1]):
-                    coor = np.array([j, i, 1])
-                    res_img_coor = inv_H @ coor
-                    res_img_coor /= res_img_coor[2]
-                    ## TODO: knn or  bilinear interpolation
-                    y, x = int(round(res_img_coor[0])), int(round(res_img_coor[1]))
-                    if x < 0 or x >= rh or y < 0 or y >= rw:
-                        continue
-                    stitch_res[i, j] = right_img[x, y]
+            homomats: np.array,
+    ) -> np.array:
+        '''Blend images and create panorama.
 
-        ## TODO: blending
+        Args:
+            homomats (np.array): An array of homography matrices.
+        
+        Return:
+            Panorama (np.array).
+        '''
+        print(f'Image blending...')
+
+        # res = self.images[0]
+        # inv_H = np.linalg.inv(homomat)
+        # for i in range(1, self.n_images):
+        #     left_img = res
+        #     right_img = self.images[i]
+        #     (lh, lw) = left_img[:2]
+        #     (rh, rw) = right_img[:2]
+        #     stitch_res = np.zeros((max(lh, rh), lw+rw, 3), dtype='int')
+        #     for i in range(stitch_res.shape[0]):
+        #         for j in range(stitch_res.shape[1]):
+        #             coor = np.array([j, i, 1])
+        #             res_img_coor = inv_H @ coor
+        #             res_img_coor /= res_img_coor[2]
+        #             ## TODO: knn or  bilinear interpolation
+        #             y, x = int(round(res_img_coor[0])), int(round(res_img_coor[1]))
+        #             if x < 0 or x >= rh or y < 0 or y >= rw:
+        #                 continue
+        #             stitch_res[i, j] = right_img[x, y]
+
+        # ## TODO: blending
+
+        # Implemented by yhfang
+        panorama = np.zeros((self.h, self.w * self.n_images, 3))
+        h, w, c = self.images[0].shape
+        panorama[:h, :w] = self.images[0]
+        w_offset = w
+
+        H = np.identity(3)
+        i = 0
+        for image, Hi in tqdm(zip(self.images[1: ], homomats), total=len(homomats)):
+            panorama, w_offset = self._blend_two_images(image, panorama.copy(), Hi, w_offset)
+            
+            i += 1
+            if self.visualization:
+                cv2.imwrite(f'./test_data/visualization/panorama_{i}.png', panorama)
+    
+    def _blend_two_images(
+        self,
+        src_img,
+        dst_img,
+        H,
+        w_offset,
+    ):
+        '''Blend two images linearly.
+        '''
+        h, w, c = src_img.shape
+
+        x_mesh, y_mesh = np.meshgrid(np.arange(0, w), np.arange(0, h))
+        x_mesh = x_mesh.flatten()
+        y_mesh = y_mesh.flatten()
+
+        # Backward warping
+        dst_coord = np.stack([x_mesh, y_mesh, np.ones_like(x_mesh)])
+        src_coord = np.linalg.inv(H) @ dst_coord
+        src_coord /= src_coord[2]
+
+        # Remove points that are out of range.
+        mask = np.logical_or(np.logical_or(src_coord[0] < 0, src_coord[0] >= w - 1), 
+                            np.logical_or(src_coord[1] < 0, src_coord[1] >= h - 1))  # (self.h * self.w * self.n_images,)
+        src_x, src_y = np.delete(src_coord[0], mask), np.delete(src_coord[1], mask)  # (2149,), (2149,)
+        dst_x, dst_y = np.delete(dst_coord[0], mask), np.delete(dst_coord[1], mask)
+
+        dst_img[dst_y, w_offset + dst_x] = self._bilinear_interpolate(src_img, src_x, src_y)
+
+        return dst_img, max(w_offset + dst_x)
+
+    def _bilinear_interpolate(
+        self,
+        src,
+        src_x,
+        src_y,
+    ) -> np.array: 
+        dx = src_x - src_x.astype(int)
+        dy = src_y - src_y.astype(int)
+
+        a = (1 - dx) * (1 - dy)  # The weight to the bottom left point.
+        b = dx *  (1 - dy)   # The weight to the bottom right
+        c = dx * dy  # The weight to the upper right
+        d = (1 - dx) * dy  # The weight to the upper left
+
+        src_x = src_x.astype(int)
+        src_y = src_y.astype(int)
+
+        return a[..., None] * src[src_y, src_x] + b[..., None] * src[src_y, src_x + 1] + c[..., None] * src[src_y + 1, src_x + 1] + d[..., None] * src[src_y + 1, src_x]
