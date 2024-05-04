@@ -31,7 +31,7 @@ def load_images(root):
     print('Loading images...')
 
     images = []
-    for i in range(3):
+    for i in range(19):
         image_path = root + f"/IMG_0{103+i}.JPG"
         image = cv2.imread(image_path)
         image = cv2.resize(image, (870, 580), interpolation=cv2.INTER_AREA)
@@ -66,6 +66,8 @@ def main(args):
 
     # blending:
     panorama = match.blending(homo_matrices)
+    # panorama = cv2.cvtColor(panorama, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(os.path.join(args.result_path, 'panorama.png'), panorama[:, :, ::-1])
 
     # bundle adjustment:
 

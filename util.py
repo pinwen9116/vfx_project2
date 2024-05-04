@@ -479,7 +479,6 @@ class Matching():
             H = np.identity(3)
             i = 0
             for image, Hi in tqdm(zip(self.images[1: ], homomats), total=len(homomats)):
-                print(f'w_offset: {w_offset}')
                 H = H @ Hi
                 panorama, w_offset = self._blend_two_images(image, panorama.copy(), H, w_offset)
                 
@@ -495,7 +494,7 @@ class Matching():
             print(shift_sums)
 
             # Stitching
-            offset = np.array([0, 0]).astype(int)  # (w_offset, h_offset)
+            offset = np.array([w, 0]).astype(int)  # (w_offset, h_offset)
             i = 0
             for image, shift in tqdm(zip(self.images[1: ], shift_sums), total=len(shift_sums)):
                 panorama, offset = self._blend_two_images_shift(image, panorama.copy(), shift, offset=offset)
@@ -503,6 +502,8 @@ class Matching():
                 i += 1
                 if self.visualization:
                     cv2.imwrite(f'./test_data/visualization/panorama_{i}.png', panorama)
+
+        return panorama
     
     def _blend_two_images(
         self,
@@ -549,23 +550,20 @@ class Matching():
         h, w, c = src_img.shape
         dh, dw, dc = dst_img.shape
 
-        print(f'offset: {offset}')
-        print(f'shift: {shift}')
-
         for src_x in range(0, w):
             for src_y in range(0, h):
-                # TODO: Check the relation between dst coordinate, src coordinage,  shift and offset
-                dst_x = src_x + shift[0] - offset[0]
-                dst_y = src_y + shift[1] - offset[1]
+                dst_x = src_x - shift[0] + offset[0]
+                # TODO: Check the vertical coordinate
+                dst_y = src_y - shift[1] + offset[1]
 
                 if dst_x < 0 or dst_x >= dw or dst_y < 0 or dst_y >= dh:
                     continue
 
                 dst_img[dst_y, dst_x] = src_img[src_y, src_x]
 
-        # TODO: Check whether the offset update is correct.
-        w_offset = offset[0] + shift[0]
-        h_offset = offset[1] + shift[1]
+        w_offset = offset[0] + w
+        # TODO: Check the update of vertical offset
+        h_offset = offset[1]
 
         return dst_img, np.array([w_offset, h_offset])
 
