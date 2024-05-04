@@ -15,12 +15,13 @@ class Matching():
             images: np.array,
             focal_len: float,
             k_size: int=5,
-            corner_resp_weight: float=0.5,  # Modify this attribute to control the number of feature points. Higher value leads to fewer points.
+            corner_resp_weight: float=1,  # Modify this attribute to control the number of feature points. Higher value leads to fewer points.
             n_bins: float=8,
             p_size: int=8,
             desc_thres: float=0.2,
             match_dist_ratio: float=0.8,
             n_iter: int=100000,
+            use_ransac_homo: bool=False,
             ransac_in_thres: int=5,
             visualization: bool=True,
         ) -> None:
@@ -39,6 +40,7 @@ class Matching():
         self._ransac_in_thres = ransac_in_thres
 
         self.visualization = visualization
+        self.use_ransac_homo = use_ransac_homo
         self.images = self.warping(images) # shape: (17, 512, 384, 3)
 
     def warping(self, images):
@@ -50,7 +52,8 @@ class Matching():
         for new_y in range(self.h):
             for new_x in range(self.w):
                 x = round(self.focal_len * math.tan((new_x - x_center) / self.focal_len) + x_center)
-                y = round(math.sqrt(x**2 + self.focal_len ** 2) * (new_y - y_center) / self.focal_len + y_center)
+                # y = round(math.sqrt(x**2 + self.focal_len ** 2) * (new_y - y_center) / self.focal_len + y_center)
+                y = round(( (new_y - y_center) / np.cos( (new_x - x_center) / self.focal_len) ) + y_center)  # Reference: https://stackoverflow.com/questions/68543804/image-stitching-problem-using-python-and-opencv
                 
                 if (0 <= x) and (x < self.w) and (0 <= y) and (y < self.h):
                     warped_images[: , new_y, new_x, :] = images[: , y, x, ::-1]
@@ -331,14 +334,21 @@ class Matching():
         '''
         print(f'Image matching...')
 
+        best_shifts = list()
         homo_matrices = list()
+
         for coord_pair in tqdm(coord_pairs):
             n_sample = len(coord_pair[0])
             n_subSample = n_sample // 10
-            homo_matrix = self.RANSAC(coord_pair, n_sample=n_sample, n_iter=self._n_iter, n_subSample=4, threshold=self._ransac_in_thres)
-            homo_matrices.append(homo_matrix)
-        
-        return np.array(homo_matrices)
+
+            if self.use_ransac_homo:
+                homo_matrix = self.RANSAC(coord_pair, n_sample=n_sample, n_iter=self._n_iter, n_subSample=4, threshold=self._ransac_in_thres)
+                homo_matrices.append(homo_matrix)
+            else:
+                shift = self.RANSAC_shift(coord_pair, n_sample=n_sample, n_iter=self._n_iter, n_subSample=4)
+                best_shifts.append(shift)
+
+        return np.array(homo_matrices) if self.use_ransac_homo else np.array(best_shifts)
 
     def RANSAC(
             self,
@@ -389,6 +399,45 @@ class Matching():
                 best_H = H
 
         return best_H
+    
+    def RANSAC_shift(
+            self,
+            coor_pair,
+            n_sample,
+            n_iter,
+            n_subSample,
+    ):
+        '''Implementation of RANSAC
+
+        Args:
+            coor_pair (list): The coordinates of the matching pairs between two images. `coor_pair[0]` represents the points in the first image, while `coor_pair[0]` represents that in the second one.
+            n_sample (int): Number of matching pairs. This should be equal to `len(coor_pair[0])` and `len(coor_pair[1])`.
+            n_iter (int): The number of iteration.
+            n_subSample (int): The number of samples to formulate the fitted model.
+
+        Return:
+            Best shift: the `coor_2` (right) minus `coor_1` (left)
+        '''
+        coor_1 = np.array(coor_pair[0])
+        coor_2 = np.array(coor_pair[1])
+
+        best_shift = np.mean(coor_2 - coor_1, axis=0).astype(int)
+        min_diff = float('inf')
+
+        for _ in range(n_iter):
+            # Draw `n_subSampleIdx` points and fit the model with them.
+            subSampleIdx = random.sample(range(n_sample), n_subSample)  # (n_subSample, 2)
+            # TODO: Check whether the `shift[0]` (x-coordinate) should be positive or negative. 右圖 `x` 減左圖 `x` 應該要小於 0 吧
+            shift = np.mean(coor_2[subSampleIdx] - coor_1[subSampleIdx], axis=0).astype(int)
+            shifted_coor_1 = coor_1 + shift
+
+            diff = np.sum(np.abs(coor_2 - shifted_coor_1))
+            
+            if diff < min_diff:
+                min_diff = diff
+                best_shift = shift
+
+        return best_shift
 
     def homography(
             self,
@@ -409,7 +458,7 @@ class Matching():
     
     def blending(
             self,
-            homomats: np.array,
+            shifts: np.array,
     ) -> np.array:
         '''Blend images and create panorama.
 
@@ -421,41 +470,39 @@ class Matching():
         '''
         print(f'Image blending...')
 
-        # res = self.images[0]
-        # inv_H = np.linalg.inv(homomat)
-        # for i in range(1, self.n_images):
-        #     left_img = res
-        #     right_img = self.images[i]
-        #     (lh, lw) = left_img[:2]
-        #     (rh, rw) = right_img[:2]
-        #     stitch_res = np.zeros((max(lh, rh), lw+rw, 3), dtype='int')
-        #     for i in range(stitch_res.shape[0]):
-        #         for j in range(stitch_res.shape[1]):
-        #             coor = np.array([j, i, 1])
-        #             res_img_coor = inv_H @ coor
-        #             res_img_coor /= res_img_coor[2]
-        #             ## TODO: knn or  bilinear interpolation
-        #             y, x = int(round(res_img_coor[0])), int(round(res_img_coor[1]))
-        #             if x < 0 or x >= rh or y < 0 or y >= rw:
-        #                 continue
-        #             stitch_res[i, j] = right_img[x, y]
-
-        # ## TODO: blending
-
-        # Implemented by yhfang
         panorama = np.zeros((self.h, self.w * self.n_images, 3))
         h, w, c = self.images[0].shape
         panorama[:h, :w] = self.images[0]
-        w_offset = w
 
-        H = np.identity(3)
-        i = 0
-        for image, Hi in tqdm(zip(self.images[1: ], homomats), total=len(homomats)):
-            panorama, w_offset = self._blend_two_images(image, panorama.copy(), Hi, w_offset)
-            
-            i += 1
-            if self.visualization:
-                cv2.imwrite(f'./test_data/visualization/panorama_{i}.png', panorama)
+        if self.use_ransac_homo:
+            w_offset = 0
+            H = np.identity(3)
+            i = 0
+            for image, Hi in tqdm(zip(self.images[1: ], homomats), total=len(homomats)):
+                print(f'w_offset: {w_offset}')
+                H = H @ Hi
+                panorama, w_offset = self._blend_two_images(image, panorama.copy(), H, w_offset)
+                
+                i += 1
+                if self.visualization:
+                    cv2.imwrite(f'./test_data/visualization/panorama_{i}.png', panorama)
+        else:
+            # Adjust shifts
+            shift_sums = np.ones_like(shifts) * shifts[0]
+            for i in range(1, len(shift_sums)):
+                shift_sums[i] = shift_sums[i-1] + shifts[i]
+            print(shifts)
+            print(shift_sums)
+
+            # Stitching
+            offset = np.array([0, 0]).astype(int)  # (w_offset, h_offset)
+            i = 0
+            for image, shift in tqdm(zip(self.images[1: ], shift_sums), total=len(shift_sums)):
+                panorama, offset = self._blend_two_images_shift(image, panorama.copy(), shift, offset=offset)
+
+                i += 1
+                if self.visualization:
+                    cv2.imwrite(f'./test_data/visualization/panorama_{i}.png', panorama)
     
     def _blend_two_images(
         self,
@@ -485,7 +532,42 @@ class Matching():
 
         dst_img[dst_y, w_offset + dst_x] = self._bilinear_interpolate(src_img, src_x, src_y)
 
-        return dst_img, max(w_offset + dst_x)
+        # offset = min(w_offset + dst_x)
+        offset = w_offset + max(src_x)
+
+        return dst_img, math.floor(offset)
+    
+    def _blend_two_images_shift(
+        self,
+        src_img,
+        dst_img,
+        shift,  # feature point shift (right - left)
+        offset,  # The upper left coordinate of the previous image (w, h)
+    ):
+        '''Blend two images linearly.
+        '''
+        h, w, c = src_img.shape
+        dh, dw, dc = dst_img.shape
+
+        print(f'offset: {offset}')
+        print(f'shift: {shift}')
+
+        for src_x in range(0, w):
+            for src_y in range(0, h):
+                # TODO: Check the relation between dst coordinate, src coordinage,  shift and offset
+                dst_x = src_x + shift[0] - offset[0]
+                dst_y = src_y + shift[1] - offset[1]
+
+                if dst_x < 0 or dst_x >= dw or dst_y < 0 or dst_y >= dh:
+                    continue
+
+                dst_img[dst_y, dst_x] = src_img[src_y, src_x]
+
+        # TODO: Check whether the offset update is correct.
+        w_offset = offset[0] + shift[0]
+        h_offset = offset[1] + shift[1]
+
+        return dst_img, np.array([w_offset, h_offset])
 
     def _bilinear_interpolate(
         self,
