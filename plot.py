@@ -16,7 +16,7 @@ def plot_images(
     
     for i, image in enumerate(images):
         plt.subplot(1, n_col, i + 1)
-        img = plt.imshow(image)
+        img = plt.imshow(image[:, :, ::-1])
         if title != None:
             plt.title(title)
         plt.axis('off')
@@ -30,7 +30,7 @@ def plot_features(
     feat_points: np.array,
     save_path: str,
 ) -> None: 
-    img = np.copy(image)
+    img = np.copy(image[:, :, ::-1])
 
     for feat_pt in feat_points:
         fp_x, fp_y = feat_pt[0], feat_pt[1]
@@ -61,7 +61,7 @@ def plot_orientations(
         7: (1, 1),
     }
 
-    img = np.copy(image)
+    img = np.copy(image[:, :, ::-1])
     h, w = bins.shape
 
     for feat_pt in feat_points:
@@ -93,4 +93,4 @@ def plot_feature_match(
 
         cv2.line(img, feat_pt1, feat_pt2, color=(0, 0, 255), thickness=1)
     
-    cv2.imwrite(save_path, img)
+    cv2.imwrite(save_path, img[:, :, ::-1])

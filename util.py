@@ -24,6 +24,7 @@ class Matching():
             use_ransac_homo: bool=False,
             ransac_in_thres: int=5,
             visualization: bool=True,
+            visual_path: str='test_data/visualization/'
         ) -> None:
         self.n_images = images.shape[0]
         self.h = images.shape[1]
@@ -38,9 +39,12 @@ class Matching():
         self._match_dist_ratio = match_dist_ratio
         self._n_iter = n_iter
         self._ransac_in_thres = ransac_in_thres
+        self.use_ransac_homo = use_ransac_homo
 
         self.visualization = visualization
-        self.use_ransac_homo = use_ransac_homo
+        self.visual_path = visual_path
+        os.makedirs(self.visual_path, exist_ok = True)
+
         self.images = self.warping(images) # shape: (17, 512, 384, 3)
 
     def warping(self, images):
@@ -60,7 +64,7 @@ class Matching():
         
         # Visualization
         if self.visualization:
-            plot_images(warped_images[:5], './test_data/visualization/warp_images.jpg')
+            plot_images(warped_images[:5], os.path.join(self.visual_path, 'warp_images.jpg'))
 
         return warped_images
 
@@ -106,8 +110,8 @@ class Matching():
             descriptor_list.append(descriptors)
         
         if self.visualization:
-            plot_features(self.images[0], feat_point_list[0], './test_data/visualization/feature_points.jpg')
-            plot_orientations(self.images[0], feat_point_list[0], orientation_list[0], './test_data/visualization/feature_orientations.jpg')
+            plot_features(self.images[0], feat_point_list[0], os.path.join(self.visual_path, 'feature_points.jpg'))
+            plot_orientations(self.images[0], feat_point_list[0], orientation_list[0], os.path.join(self.visual_path, 'feature_orientations.jpg'))
 
         return feat_point_list, descriptor_list
     
@@ -166,7 +170,7 @@ class Matching():
                 coords_2.append(feat_points_2[j1])
         
         if self.visualization:
-            plot_feature_match(image_1, coords_1, image_2, coords_2, './test_data/visualization/feature_match.jpg')
+            plot_feature_match(image_1, coords_1, image_2, coords_2, os.path.join(self.visual_path, 'feature_match.jpg'))
 
         return coords_1, coords_2
 
@@ -477,14 +481,10 @@ class Matching():
         if self.use_ransac_homo:
             w_offset = 0
             H = np.identity(3)
-            i = 0
+            homomats = shifts
             for image, Hi in tqdm(zip(self.images[1: ], homomats), total=len(homomats)):
                 H = H @ Hi
                 panorama, w_offset = self._blend_two_images(image, panorama.copy(), H, w_offset)
-                
-                i += 1
-                if self.visualization:
-                    cv2.imwrite(f'./test_data/visualization/panorama_{i}.png', panorama)
         else:
             # Adjust shifts
             shift_sums = np.ones_like(shifts) * shifts[0]
@@ -495,13 +495,9 @@ class Matching():
 
             # Stitching
             offset = np.array([w, 0]).astype(int)  # (w_offset, h_offset)
-            i = 0
+
             for image, shift in tqdm(zip(self.images[1: ], shift_sums), total=len(shift_sums)):
                 panorama, offset = self._blend_two_images_shift(image, panorama.copy(), shift, offset=offset)
-
-                i += 1
-                if self.visualization:
-                    cv2.imwrite(f'./test_data/visualization/panorama_{i}.png', panorama)
 
         return panorama
     
