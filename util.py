@@ -474,19 +474,24 @@ class Matching():
         '''
         print(f'Image blending...')
 
-        panorama = np.zeros((self.h, self.w * self.n_images, 3))
-        h, w, c = self.images[0].shape
-        panorama[:h, :w] = self.images[0]
-
         if self.use_ransac_homo:
+            panorama = np.zeros((self.h, self.w * self.n_images, 3))
+            h, w, c = self.images[0].shape
+            panorama[:h, :w] = self.images[0]
+
             w_offset = 0
             H = np.identity(3)
             homomats = shifts
             for image, Hi in tqdm(zip(self.images[1: ], homomats), total=len(homomats)):
                 H = H @ Hi
                 panorama, w_offset = self._blend_two_images(image, panorama.copy(), H, w_offset)
+            return panorama
         else:
             # Adjust shifts
+            panorama = np.zeros((self.h, self.w * self.n_images, 3))
+            h, w, c = self.images[0].shape
+            panorama[:h, :w] = self.images[0]
+
             shift_sums = np.ones_like(shifts) * shifts[0]
             for i in range(1, len(shift_sums)):
                 shift_sums[i] = shift_sums[i-1] + shifts[i]
@@ -497,9 +502,9 @@ class Matching():
             offset = np.array([w, 0]).astype(int)  # (w_offset, h_offset)
 
             for image, shift in tqdm(zip(self.images[1: ], shift_sums), total=len(shift_sums)):
-                panorama, offset = self._blend_two_images_shift(image, panorama.copy(), shift, offset=offset)
+                panorama, offset, max_dst_x = self._blend_two_images_shift(image, panorama.copy(), shift, offset=offset)
 
-        return panorama
+        return panorama[:, :max_dst_x, :]
     
     def _blend_two_images(
         self,
@@ -546,6 +551,7 @@ class Matching():
         h, w, c = src_img.shape
         dh, dw, dc = dst_img.shape
 
+        max_dst_x = 0
         for src_x in range(0, w):
             for src_y in range(0, h):
                 dst_x = src_x - shift[0] + offset[0]
@@ -557,11 +563,13 @@ class Matching():
 
                 dst_img[dst_y, dst_x] = src_img[src_y, src_x]
 
+                max_dst_x = max(max_dst_x, dst_x)
+
         w_offset = offset[0] + w
         # TODO: Check the update of vertical offset
         h_offset = offset[1]
 
-        return dst_img, np.array([w_offset, h_offset])
+        return dst_img, np.array([w_offset, h_offset]), max_dst_x
 
     def _bilinear_interpolate(
         self,
