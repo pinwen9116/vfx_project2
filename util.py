@@ -495,16 +495,19 @@ class Matching():
             shift_sums = np.ones_like(shifts) * shifts[0]
             for i in range(1, len(shift_sums)):
                 shift_sums[i] = shift_sums[i-1] + shifts[i]
-            print(shifts)
-            print(shift_sums)
 
             # Stitching
+            min_dst_y = np.min(shift_sums[:, 1])
+            min_dst_y = -min(min_dst_y, 0)
+            max_dst_y = np.max(shift_sums[:, 1])
+            max_dst_y = -max(max_dst_y, 0)
+
             offset = np.array([w, 0]).astype(int)  # (w_offset, h_offset)
 
             for image, shift in tqdm(zip(self.images[1: ], shift_sums), total=len(shift_sums)):
-                panorama, offset, max_dst_x = self._blend_two_images_shift(image, panorama.copy(), shift, offset=offset)
+                panorama, offset, boundary = self._blend_two_images_shift(image, panorama.copy(), shift, offset=offset)
 
-        return panorama[:, :max_dst_x, :]
+            return panorama[min_dst_y: max_dst_y, 0: boundary[1], :]
     
     def _blend_two_images(
         self,
@@ -551,7 +554,13 @@ class Matching():
         h, w, c = src_img.shape
         dh, dw, dc = dst_img.shape
 
+        bound_w = 8
+
+        min_dst_x = float('inf')
         max_dst_x = 0
+        min_dst_y = float('inf')
+        max_dst_y = 0
+
         for src_x in range(0, w):
             for src_y in range(0, h):
                 dst_x = src_x - shift[0] + offset[0]
@@ -563,13 +572,28 @@ class Matching():
 
                 dst_img[dst_y, dst_x] = src_img[src_y, src_x]
 
+                # Horizontal smooth
+                if src_x in range(bound_w + 1):
+                    left_x = 0 - shift[0] + offset[0] - 1
+                    right_x = bound_w - shift[0] + offset[0] + 1
+                    dst_img[dst_y, dst_x] = (bound_w + 1 - src_x)/(bound_w + 1) * dst_img[dst_y, left_x] + src_x/(bound_w + 1) * dst_img[dst_y, right_x]
+
+                min_dst_x = min(min_dst_x, dst_x)
                 max_dst_x = max(max_dst_x, dst_x)
+                min_dst_y = min(min_dst_y, dst_y)
+                max_dst_y = max(max_dst_y, dst_y)
+            
+            # Vertical smooth
+            if src_x in range(bound_w):
+                y_grid = np.arange(1, h-1)
+                dst_x = src_x - shift[0] + offset[0]
+                dst_img[y_grid, dst_x] = 1/2 * dst_img[y_grid - 1, dst_x] + 1/2 * dst_img[y_grid + 1, dst_x]
 
         w_offset = offset[0] + w
         # TODO: Check the update of vertical offset
         h_offset = offset[1]
 
-        return dst_img, np.array([w_offset, h_offset]), max_dst_x
+        return dst_img, np.array([w_offset, h_offset]), np.array([min_dst_x, max_dst_x, min_dst_y, max_dst_y])
 
     def _bilinear_interpolate(
         self,
