@@ -34,7 +34,7 @@ def load_images(root):
         if i == 15: continue
         image_path = root + f"/IMG_0{103+i}.JPG"
         image = cv2.imread(image_path)
-        image = cv2.resize(image, (870, 580), interpolation=cv2.INTER_AREA)
+        image = cv2.resize(image, (870*2, 580*2), interpolation=cv2.INTER_AREA)
 
         images.append(image)
     
