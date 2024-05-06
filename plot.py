@@ -30,6 +30,8 @@ def plot_features(
     feat_points: np.array,
     save_path: str,
 ) -> None: 
+    print(f'Number of feature points: {len(feat_points)}')
+
     img = np.copy(image[:, :, ::-1])
 
     for feat_pt in feat_points:
@@ -79,6 +81,8 @@ def plot_feature_match(
     feat_points_2: list,
     save_path: str,
 ) -> None: 
+    print(f'Number of matching pairs: {len(feat_points_1)}')
+
     h, w, c = image_1.shape
 
     img = np.zeros((h, w * 2, c))

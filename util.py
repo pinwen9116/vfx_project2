@@ -27,8 +27,6 @@ class Matching():
             visual_path: str='test_data/visualization/'
         ) -> None:
         self.n_images = images.shape[0]
-        self.h = images.shape[1]
-        self.w = images.shape[2]
         self.focal_len = focal_len
 
         self._k_size = k_size
@@ -46,22 +44,27 @@ class Matching():
         os.makedirs(self.visual_path, exist_ok = True)
 
         self.images = self.warping(images) # shape: (17, 512, 384, 3)
+        self.h = self.images.shape[1]
+        self.w = self.images.shape[2]
+        print(self.images.shape)
 
     def warping(self, images):
+        n, h, w, c = images.shape
         warped_images = np.zeros(images.shape, 'uint8')
 
-        x_center = self.w // 2
-        y_center = self.h // 2
+        x_center = w // 2
+        y_center = h // 2
 
-        for new_y in range(self.h):
-            for new_x in range(self.w):
+        for new_y in range(h):
+            for new_x in range(w):
                 x = round(self.focal_len * math.tan((new_x - x_center) / self.focal_len) + x_center)
                 # y = round(math.sqrt(x**2 + self.focal_len ** 2) * (new_y - y_center) / self.focal_len + y_center)
                 y = round(( (new_y - y_center) / np.cos( (new_x - x_center) / self.focal_len) ) + y_center)  # Reference: https://stackoverflow.com/questions/68543804/image-stitching-problem-using-python-and-opencv
                 
-                if (0 <= x) and (x < self.w) and (0 <= y) and (y < self.h):
+                if (0 <= x) and (x < w) and (0 <= y) and (y < h):
                     warped_images[: , new_y, new_x, :] = images[: , y, x, ::-1]
-        
+        warped_images = warped_images[:, 8:-8, 8:-8, :]
+
         # Visualization
         if self.visualization:
             plot_images(warped_images[:5], os.path.join(self.visual_path, 'warp_images.jpg'))
@@ -573,10 +576,10 @@ class Matching():
                 dst_img[dst_y, dst_x] = src_img[src_y, src_x]
 
                 # Horizontal smooth
-                if src_x in range(bound_w + 1):
-                    left_x = 0 - shift[0] + offset[0] - 1
-                    right_x = bound_w - shift[0] + offset[0] + 1
-                    dst_img[dst_y, dst_x] = (bound_w + 1 - src_x)/(bound_w + 1) * dst_img[dst_y, left_x] + src_x/(bound_w + 1) * dst_img[dst_y, right_x]
+                # if src_x in range(bound_w + 1):
+                #     left_x = 0 - shift[0] + offset[0] - 1
+                #     right_x = bound_w - shift[0] + offset[0] + 1
+                #     dst_img[dst_y, dst_x] = (bound_w + 1 - src_x)/(bound_w + 1) * dst_img[dst_y, left_x] + src_x/(bound_w + 1) * dst_img[dst_y, right_x]
 
                 min_dst_x = min(min_dst_x, dst_x)
                 max_dst_x = max(max_dst_x, dst_x)
@@ -584,10 +587,10 @@ class Matching():
                 max_dst_y = max(max_dst_y, dst_y)
             
             # Vertical smooth
-            if src_x in range(bound_w):
-                y_grid = np.arange(1, h-1)
-                dst_x = src_x - shift[0] + offset[0]
-                dst_img[y_grid, dst_x] = 1/2 * dst_img[y_grid - 1, dst_x] + 1/2 * dst_img[y_grid + 1, dst_x]
+            # if src_x in range(bound_w):
+            #     y_grid = np.arange(1, h-1)
+            #     dst_x = src_x - shift[0] + offset[0]
+            #     dst_img[y_grid, dst_x] = 1/2 * dst_img[y_grid - 1, dst_x] + 1/2 * dst_img[y_grid + 1, dst_x]
 
         w_offset = offset[0] + w
         # TODO: Check the update of vertical offset
